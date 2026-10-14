@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(uuid())
+  name         String
+  email        String      @unique
+  passwordHash String
+  role         String      @default("ORCAMENTISTA")
+  ativo        Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sessions     Session[]
+  orcamentos   Orcamento[]
+  logs         StatusLog[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Lead {
+  id              String      @id @default(uuid())
+  nome            String
+  email           String
+  telefone        String?
+  empresa         String?
+  mensagemInicial String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  orcamentos      Orcamento[]
+
+  @@map("leads")
+}
+
+model Orcamento {
+  id                 String              @id @default(uuid())
+  numeroProtocolo    String              @unique
+  status             String              @default("AGUARDANDO_CLIENTE")
+  leadId             String
+  lead               Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  orcamentistaId     String?
+  orcamentista       User?               @relation(fields: [orcamentistaId], references: [id], onDelete: SetNull)
+  
+  magicLink          MagicLink?
+  respostaFormulario RespostaFormulario?
+  propostaComercial  PropostaComercial?
+  logs               StatusLog[]
+
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([status])
+  @@index([leadId])
+  @@index([orcamentistaId])
+  @@map("orcamentos")
+}
+
+model MagicLink {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  orcamentoId String    @unique
+  orcamento   Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  used        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([token])
+  @@map("magic_links")
+}
+
+model RespostaFormulario {
+  id                     String    @id @default(uuid())
+  orcamentoId            String    @unique
+  orcamento              Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  // 1. Dados Cadastrais e de Contato
+  empresa                String
+  contatoNome            String
+  email                  String
+  telefone               String
+
+  // 2. Caracterização e Planejamento da Obra
+  naturezaContratacao    String    @default("Obra Própria / Execução Direta") // Concorrência ou Obra Própria
+  dataLimiteConcorrencia String?
+  previsaoInicio         String    @default("Imediato (em até 15 dias)")
+
+  // 3. Dados Técnicos de Engenharia e Geotecnia
+  sondagensStatus        String    @default("Sim, possuo laudo de sondagem concluído")
+  sondagensArquivoUrl    String?
+  sondagensDetalhes      String?
+
+  projetosStatus         String    @default("Projeto Executivo de Fundações Completo")
+  projetosArquivoUrl     String?
+
+  // 4. Quantitativos e Especificação Técnica
+  tipoFundacao           String    @default("Estaca Metálica")
+  especificacoes         String?
+  quantidadeEstacas      Int       @default(1)
+  profundidadeMedia      Float?
+  metragemTotalEstimada  Float?
+  ensaiosRequeridos      String?
+  observacoes            String?
+
+  submittedAt            DateTime  @default(now())
+
+  @@map("respostas_formulario")
+}
+
+model PropostaComercial {
+  id                   String    @id @default(uuid())
+  orcamentoId          String    @unique
+  orcamento            Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  custoMaoDeObra       Float     @default(0)
+  custoMateriais       Float     @default(0)
+  custosExtras         Float     @default(0)
+  bdiMargemPerc        Float     @default(15)
+  valorTotal           Float     @default(0)
+  condicoesPagamento   String?
+  prazoExecucaoDias    Int       @default(15)
+  validadePropostaDias Int       @default(10)
+  observacoes          String?
+  pdfPath              String?
+
+  geradaEm             DateTime  @default(now())
+  enviadaEm            DateTime?
+
+  @@map("propostas_comerciais")
+}
+
+model StatusLog {
+  id             String           @id @default(uuid())
+  orcamentoId    String
+  orcamento      Orcamento        @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  statusAnterior String?
+  statusNovo     String
+  motivo         String?
+  usuarioId      String?
+  usuario        User?            @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  usuarioNome    String?
+
+  createdAt      DateTime         @default(now())
+
+  @@index([orcamentoId])
+  @@map("status_logs")
+}
