@@ -10,7 +10,7 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value:
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https: ws: wss:; frame-ancestors 'none';",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com http://fonts.googleapis.com; img-src 'self' data: https: http: blob:; font-src 'self' https://fonts.gstatic.com http://fonts.gstatic.com data:; connect-src 'self' https: http: ws: wss:; frame-ancestors 'none';",
           },
           {
             key: 'X-Frame-Options',

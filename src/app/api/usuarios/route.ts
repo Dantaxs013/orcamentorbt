@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getServerSession } from '@/lib/session';
 import { hashPassword } from '@/lib/auth';
+import { sendNovoUsuarioEmail } from '@/lib/email';
 
 /**
  * GET /api/usuarios
@@ -107,10 +108,25 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Disparar e-mail de boas-vindas com as credenciais e logo
+    const baseUrl = process.env.APP_URL || 'https://orcamentos.rbtfundacoes.com.br';
+    const loginUrl = `${baseUrl}/login`;
+
+    await sendNovoUsuarioEmail({
+      to: novoUsuario.email,
+      nome: novoUsuario.name,
+      email: novoUsuario.email,
+      senhaTemporaria: password,
+      perfil: validRole === 'ADMIN' ? 'Gestor (ADMIN)' : 'Engenheiro Orçamentista',
+      loginUrl,
+    }).catch((err) => {
+      console.error('Falha ao enviar e-mail de novo usuário (não bloqueante):', err);
+    });
+
     return NextResponse.json(
       {
         success: true,
-        message: `Usuário ${novoUsuario.name} cadastrado com sucesso como ${validRole === 'ADMIN' ? 'Gestor' : 'Orçamentista'}.`,
+        message: `Usuário ${novoUsuario.name} cadastrado com sucesso e credenciais enviadas por e-mail.`,
         user: novoUsuario,
       },
       { status: 201 }

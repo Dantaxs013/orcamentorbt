@@ -45,7 +45,7 @@ Assim que você enviar as informações da obra, nosso time de engenharia inicia
 Atenciosamente,
 Equipe Comercial & Orçamentos
 RBT Fundações & Engenharia
-comercial@rbt.com.br`;
+orcamento@rbtfundacoes.com.br`;
 
   const handleCopyTemplate = () => {
     navigator.clipboard.writeText(emailTemplateText);
