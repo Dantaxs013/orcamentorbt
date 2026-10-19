@@ -15,8 +15,10 @@ import {
   AlertCircle,
   X,
   Search,
+  Trash2,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast-provider';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface Usuario {
   id: string;
@@ -58,6 +60,10 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
 
   // Atualização inline de status/perfil
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // Modal Deletar Usuário
+  const [userToDelete, setUserToDelete] = useState<Usuario | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const isGestor = currentUser.role === 'ADMIN';
 
@@ -174,6 +180,40 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
       toast.error('Erro de Conexão', 'Não foi possível alterar o status.');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const executeDeleteUser = async () => {
+    if (!userToDelete) return;
+    if (userToDelete.id === currentUser.id) {
+      toast.warning('Ação Não Permitida', 'Você não pode excluir o seu próprio usuário logado.');
+      setUserToDelete(null);
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/usuarios/${userToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error('Erro ao Excluir', data.error || 'Não foi possível excluir o usuário.');
+        return;
+      }
+
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+      toast.success(
+        'Conta Excluída',
+        `A conta de ${userToDelete.name} foi removida permanentemente do sistema.`
+      );
+      setUserToDelete(null);
+    } catch {
+      toast.error('Erro de Conexão', 'Falha ao se comunicar com o servidor.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -411,16 +451,28 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
                       {isGestor && (
                         <td className="py-3.5 px-4 sm:px-6 text-right">
                           {!isCurrent ? (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleAtivo(user.id, user.ativo)}
-                              disabled={isUpdating}
-                              className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline transition cursor-pointer"
-                            >
-                              {user.ativo ? 'Desativar' : 'Reativar'}
-                            </button>
+                            <div className="flex items-center justify-end gap-3">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAtivo(user.id, user.ativo)}
+                                disabled={isUpdating}
+                                className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline transition cursor-pointer"
+                              >
+                                {user.ativo ? 'Desativar' : 'Reativar'}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setUserToDelete(user)}
+                                disabled={isUpdating}
+                                className="p-1 text-slate-400 hover:text-[#BA1A1A] hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                title={`Excluir definitivamente ${user.name}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           ) : (
-                            <span className="text-[11px] text-slate-400">—</span>
+                            <span className="text-[11px] text-slate-400 font-medium">Você (ativo)</span>
                           )}
                         </td>
                       )}
@@ -591,6 +643,33 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmação para Exclusão de Conta */}
+      <ConfirmModal
+        isOpen={!!userToDelete}
+        title="Excluir Conta de Usuário"
+        description={
+          userToDelete ? (
+            <div className="space-y-2 text-xs text-slate-600">
+              <p>
+                Tem certeza que deseja excluir permanentemente o usuário{' '}
+                <strong className="text-slate-900">{userToDelete.name}</strong> ({userToDelete.email})?
+              </p>
+              <p className="text-[11px] text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                ⚠️ Esta ação não pode ser desfeita. Todas as sessões serão encerradas imediatamente.
+              </p>
+            </div>
+          ) : (
+            ''
+          )
+        }
+        confirmLabel="Sim, Excluir Conta"
+        cancelLabel="Cancelar"
+        variant="danger"
+        isLoading={deleting}
+        onConfirm={executeDeleteUser}
+        onCancel={() => setUserToDelete(null)}
+      />
     </div>
   );
 }

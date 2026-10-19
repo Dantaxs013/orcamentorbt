@@ -90,3 +90,58 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     );
   }
 }
+
+/**
+ * DELETE /api/usuarios/[id]
+ * Exclui permanentemente o usuário do sistema
+ */
+export async function DELETE(req: NextRequest, { params }: RouteContext) {
+  const session = await getServerSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Acesso restrito. Faça login.' }, { status: 401 });
+  }
+
+  if (session.user.role !== 'ADMIN') {
+    return NextResponse.json(
+      { error: 'Apenas Gestores (ADMIN) possuem permissão para excluir usuários.' },
+      { status: 403 }
+    );
+  }
+
+  try {
+    const { id } = params;
+
+    // Impede o gestor de deletar a sua própria conta ativa
+    if (id === session.user.id) {
+      return NextResponse.json(
+        { error: 'Você não pode excluir o seu próprio usuário em uso.' },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
+    }
+
+    // Exclui o usuário (sessões são deletadas em cascata; orçamentos e logs ficam desvinculados com SetNull)
+    await prisma.user.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Usuário ${user.name} (${user.email}) foi excluído permanentemente do sistema.`,
+    });
+  } catch (error) {
+    console.error('Erro ao excluir usuário:', error);
+    return NextResponse.json(
+      { error: 'Erro interno ao excluir usuário.' },
+      { status: 500 }
+    );
+  }
+}
+
