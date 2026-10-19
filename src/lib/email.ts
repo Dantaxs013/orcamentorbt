@@ -26,6 +26,8 @@ function getMailTransporter() {
     return null;
   }
 
+  const isOffice365 = host.includes('office365') || host.includes('outlook');
+
   return nodemailer.createTransport({
     host,
     port,
@@ -35,9 +37,11 @@ function getMailTransporter() {
       pass,
     },
     tls: {
+      ciphers: 'SSLv3',
       rejectUnauthorized: false,
     },
-    connectionTimeout: 10000,
+    requireTLS: isOffice365,
+    connectionTimeout: 15000,
   });
 }
 
