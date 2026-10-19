@@ -34,6 +34,10 @@ function getMailTransporter() {
       user,
       pass,
     },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    connectionTimeout: 10000,
   });
 }
 
