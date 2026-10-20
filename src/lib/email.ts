@@ -37,7 +37,7 @@ function getMailTransporter() {
       pass,
     },
     tls: {
-      ciphers: 'SSLv3',
+      
       rejectUnauthorized: false,
     },
     requireTLS: isOffice365,
