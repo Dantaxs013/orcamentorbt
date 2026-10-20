@@ -251,7 +251,7 @@ export async function sendNovoUsuarioEmail({
   loginUrl,
 }: NovoUsuarioEmailProps): Promise<{ success: boolean; simulated?: boolean }> {
   const transporter = getMailTransporter();
-  const from = process.env.SMTP_FROM || 'RBT Orçamentos <orcamento@rbtfundacoes.com.br>';
+  const from = process.env.SMTP_FROM || 'RBT Fundações <piatec.aviso@piatec.com>';
 
   const html = `
     <!DOCTYPE html>
