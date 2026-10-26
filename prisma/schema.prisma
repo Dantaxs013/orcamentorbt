@@ -7,20 +7,98 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ====================================================
+// ENUMS (Represented as String with defaults for SQLite compatibility)
+// TypeScript runtime enums & types defined in src/types/enums.ts
+//
+// enum Role {
+//   ADMIN
+//   ADMINISTRADOR
+//   ORCAMENTISTA
+//   ENGENHEIRO
+//   APONTADOR
+// }
+//
+// enum StatusRelatorio {
+//   RASCUNHO
+//   SUBMETIDO
+//   APROVADO
+//   REJEITADO
+// }
+//
+// enum StatusMedicao {
+//   EM_ELABORACAO
+//   SUBMETIDA_GESTAO
+//   APROVADA
+//   FATURADA
+// }
+//
+// enum StatusContrato {
+//   ATIVO
+//   PAUSADO
+//   FINALIZADO
+// }
+//
+// enum CondicaoClimatica {
+//   BOM_SOL
+//   NUBLADO
+//   CHUVA_LEVE
+//   CHUVA_FORTE
+//   IMPRACTICAVEL
+// }
+//
+// enum TipoEmenda {
+//   NENHUMA
+//   W150
+//   W310
+//   OUTRA
+// }
+//
+// enum TipoNotificacao {
+//   RELATORIO_SUBMETIDO
+//   RELATORIO_APROVADO
+//   RELATORIO_REJEITADO
+//   MEDICAO_SUBMETIDA
+//   MEDICAO_APROVADA
+//   ALERTA_SISTEMA
+// }
+
+// ====================================================
+// SHARED AUTH & IDENTITY MODELS
+// ====================================================
+
 model User {
-  id           String      @id @default(uuid())
-  name         String
-  email        String      @unique
-  passwordHash String
-  role         String      @default("ORCAMENTISTA")
-  ativo        Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id              String      @id @default(uuid())
+  name            String
+  nome            String?
+  email           String      @unique
+  passwordHash    String
+  role            String      @default("ORCAMENTISTA")
+  telefone        String?
+  ativo           Boolean     @default(true)
+  acessoOrcamento Boolean     @default(true)
+  acessoMedicao   Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  sessions     Session[]
-  orcamentos   Orcamento[]
-  logs         StatusLog[]
+  // Sessions
+  sessions            Session[]
 
+  // Orçamentos relations
+  orcamentos          Orcamento[]
+  logs                StatusLog[]
+
+  // Medição relations
+  obrasGerenciadas    Obra[]                  @relation("EngenheiroObras")
+  relatoriosApontados RelatorioDiario[]       @relation("ApontadorRelatorios")
+  relatoriosRevisados RelatorioDiario[]       @relation("RevisorRelatorios")
+  medicoesCriadas     Medicao[]               @relation("EngenheiroMedicoes")
+  medicoesAprovadas   Medicao[]               @relation("GestorMedicoes")
+  notificacoes        Notificacao[]
+  auditorias          AuditLog[]
+
+  @@index([email])
+  @@index([role])
   @@map("users")
 }
 
@@ -32,13 +110,19 @@ model Session {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([tokenHash])
   @@index([userId])
+  @@index([expiresAt])
   @@map("sessions")
 }
+
+// ====================================================
+// ORÇAMENTOS DOMAIN MODELS
+// ====================================================
 
 model Lead {
   id              String      @id @default(uuid())
@@ -103,7 +187,7 @@ model RespostaFormulario {
   telefone               String
 
   // 2. Caracterização e Planejamento da Obra
-  naturezaContratacao    String    @default("Obra Própria / Execução Direta") // Concorrência ou Obra Própria
+  naturezaContratacao    String    @default("Obra Própria / Execução Direta")
   dataLimiteConcorrencia String?
   previsaoInicio         String    @default("Imediato (em até 15 dias)")
 
@@ -167,4 +251,376 @@ model StatusLog {
 
   @@index([orcamentoId])
   @@map("status_logs")
+}
+
+// ====================================================
+// MEDIÇÃO DIÁRIA DOMAIN MODELS
+// ====================================================
+
+model Obra {
+  id                      String    @id @default(uuid())
+  codigo                  String    @unique // e.g. "OBR-2026-001"
+  nome                    String
+  cliente                 String
+  endereco                String?
+  cidade                  String?
+  estado                  String?
+  engenheiroResponsavelId String?
+  ativo                   Boolean   @default(true)
+  dataInicio              DateTime?
+  dataPrevisaoFim         DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // Relations
+  engenheiroResponsavel User?             @relation("EngenheiroObras", fields: [engenheiroResponsavelId], references: [id])
+  contratos             Contrato[]
+  relatoriosDiarios     RelatorioDiario[]
+  medicoes              Medicao[]
+  estacas               EstacaPrincipal[]
+
+  @@index([codigo])
+  @@index([engenheiroResponsavelId])
+}
+
+model Contrato {
+  id                   String         @id @default(uuid())
+  obraId               String
+  numeroContrato       String         @unique // e.g. "CTR-RBT-2026-001"
+  descricao            String?
+  dataContrato         DateTime
+  valorTotalContratual Decimal        @default(0.0)
+  status               String         @default("ATIVO")
+
+  // Deduções tributárias e retenções configuráveis (percentuais em Decimal)
+  retencaoINSS       Decimal @default(3.50)
+  baseMaoDeObra      Decimal @default(40.00)
+  retencaoISS        Decimal @default(5.00)
+  retencaoIRRF       Decimal @default(1.50)
+  retencaoCSLL       Decimal @default(1.00)
+  retencaoPIS        Decimal @default(0.65)
+  retencaoCOFINS     Decimal @default(3.00)
+  outrasDeducoesPerc Decimal @default(0.00)
+
+  observacoes String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  obra     Obra           @relation(fields: [obraId], references: [id], onDelete: Cascade)
+  itens    ItemContrato[]
+  medicoes Medicao[]
+
+  @@index([obraId])
+  @@index([numeroContrato])
+}
+
+model ItemContrato {
+  id                   String   @id @default(uuid())
+  contratoId           String
+  codigoItem           String   // e.g. "01.01", "ESTACA-W150"
+  descricao            String
+  unidadeMedida        String   // "m", "un", "kg", "vb"
+  quantidadeContratada Decimal  @default(0.0)
+  valorUnitario        Decimal  @default(0.0)
+  valorTotal           Decimal  @default(0.0)
+  ordem                Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Relations
+  contrato     Contrato      @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  itensMedicao ItemMedicao[]
+
+  @@index([contratoId])
+  @@index([codigoItem])
+}
+
+model RelatorioDiario {
+  id               String            @id @default(uuid())
+  obraId           String
+  apontadorId      String
+  revisadoPorId    String?
+  numeroSequencial Int
+  data             DateTime
+  turno            String            @default("DIURNO")
+  horaInicio       String?
+  horaFim          String?
+
+  maquinaEquipamento String
+  operador           String
+  encarregado        String?
+  equipeDescricao    String?
+  condicaoClimatica  String            @default("BOM_SOL")
+
+  status         String          @default("RASCUNHO")
+  observacoes    String?
+  motivoRejeicao String?
+
+  assinadoApontador        Boolean   @default(false)
+  dataAssinaturaApontador   DateTime?
+  assinadoEngenheiro       Boolean   @default(false)
+  dataAssinaturaEngenheiro DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  obra            Obra                      @relation(fields: [obraId], references: [id], onDelete: Cascade)
+  apontador       User                      @relation("ApontadorRelatorios", fields: [apontadorId], references: [id])
+  revisor         User?                     @relation("RevisorRelatorios", fields: [revisadoPorId], references: [id])
+  linhasProducao  LinhaProducao[]
+  vinculosMedicao MedicaoRelatorioVinculo[]
+
+  @@unique([obraId, numeroSequencial])
+  @@index([obraId, data])
+  @@index([apontadorId])
+  @@index([status])
+}
+
+model LinhaProducao {
+  id              String   @id @default(uuid())
+  relatorioId     String
+  numeroLinha     Int      // 1 to 25
+  numeroEstaca    String?
+  perfil          String?  // W150, W310, etc.
+  horaInicio      String?
+  horaFim         String?
+
+  profundidade    Decimal  @default(0.0)
+  cotaTerreno     Decimal?
+  cotaArrasamento Decimal?
+  comprimentoUtil Decimal?
+  diametro        Int?
+
+  emendaW150      Int      @default(0)
+  emendaW310      Int      @default(0)
+  talas           Int      @default(0)
+  arrasamento     Decimal  @default(0.0)
+
+  tempoParadaMinutos Int      @default(0)
+  motivoParada       String?
+  observacao         String?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  relatorio RelatorioDiario @relation(fields: [relatorioId], references: [id], onDelete: Cascade)
+
+  @@unique([relatorioId, numeroLinha])
+  @@index([relatorioId])
+}
+
+model Medicao {
+  id                  String        @id @default(uuid())
+  obraId              String
+  contratoId          String
+  engenheiroId        String
+  aprovadoPorGestorId String?
+  numeroMedicao       Int
+  periodoInicio       DateTime
+  periodoFim          DateTime
+  dataEmissao         DateTime      @default(now())
+
+  valorBruto          Decimal       @default(0.0)
+
+  retencaoINSSValor   Decimal       @default(0.0)
+  retencaoISSValor    Decimal       @default(0.0)
+  retencaoIRRFValor   Decimal       @default(0.0)
+  retencaoCSLLValor   Decimal       @default(0.0)
+  retencaoPISValor    Decimal       @default(0.0)
+  retencaoCOFINSValor Decimal       @default(0.0)
+  outrasDeducoesValor Decimal       @default(0.0)
+  totalDeducoes       Decimal       @default(0.0)
+  valorLiquido        Decimal       @default(0.0)
+
+  status              String        @default("EM_ELABORACAO")
+  observacoes         String?
+  dataAprovacaoGestor DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relations
+  obra                 Obra                      @relation(fields: [obraId], references: [id], onDelete: Cascade)
+  contrato             Contrato                  @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  engenheiro           User                      @relation("EngenheiroMedicoes", fields: [engenheiroId], references: [id])
+  gestorAprovador      User?                     @relation("GestorMedicoes", fields: [aprovadoPorGestorId], references: [id])
+  itensMedicao         ItemMedicao[]
+  relatoriosVinculados MedicaoRelatorioVinculo[]
+
+  @@unique([contratoId, numeroMedicao])
+  @@index([obraId])
+  @@index([status])
+}
+
+model ItemMedicao {
+  id                  String   @id @default(uuid())
+  medicaoId           String
+  itemContratoId      String
+
+  quantidadeAnterior  Decimal  @default(0.0)
+  quantidadePeriodo   Decimal  @default(0.0)
+  quantidadeAcumulada Decimal  @default(0.0)
+  saldoQuantidade     Decimal  @default(0.0)
+
+  valorUnitario       Decimal  @default(0.0)
+  valorPeriodo        Decimal  @default(0.0)
+  valorAcumulado      Decimal  @default(0.0)
+  saldoValor          Decimal  @default(0.0)
+
+  createdAt           DateTime @default(now())
+
+  // Relations
+  medicao      Medicao      @relation(fields: [medicaoId], references: [id], onDelete: Cascade)
+  itemContrato ItemContrato @relation(fields: [itemContratoId], references: [id], onDelete: Cascade)
+
+  @@unique([medicaoId, itemContratoId])
+  @@index([medicaoId])
+  @@index([itemContratoId])
+}
+
+model MedicaoRelatorioVinculo {
+  id          String   @id @default(uuid())
+  medicaoId   String
+  relatorioId String
+  createdAt   DateTime @default(now())
+
+  medicao   Medicao         @relation(fields: [medicaoId], references: [id], onDelete: Cascade)
+  relatorio RelatorioDiario @relation(fields: [relatorioId], references: [id], onDelete: Cascade)
+
+  @@unique([medicaoId, relatorioId])
+  @@index([medicaoId])
+  @@index([relatorioId])
+}
+
+model Notificacao {
+  id        String          @id @default(uuid())
+  userId    String
+  titulo    String
+  mensagem  String
+  tipo      String
+  lida      Boolean         @default(false)
+  link      String?
+  metadata  String?
+  createdAt DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lida])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  acao        String
+  entidade    String
+  entidadeId  String?
+  detalhes    String?
+  dadosAntes  String?
+  dadosDepois String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entidade, entidadeId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model RateLimitRecord {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  count     Int      @default(1)
+  expiresAt DateTime
+
+  @@index([key, expiresAt])
+}
+
+model EstacaPrincipal {
+  id          String   @id @default(uuid())
+  obraId      String?
+  nome        String   // Nome da estaca (ex: "E-01", "E-02")
+  perfil      String   // Perfil / Emenda (ex: "W150x22.5", "W310x38.7", "W150", "W310")
+  comprimento Decimal  @default(0.0) // Comprimento em metros
+  status      String   @default("PENDENTE") // PENDENTE, CRAVADA
+  observacao  String?
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  obra        Obra?    @relation(fields: [obraId], references: [id], onDelete: Cascade)
+
+  @@index([obraId])
+  @@index([nome])
+}
+
+
+// ====================================================
+// CONTROLE DE PROPOSTAS COMERCIAIS (RBT FUNDAÇÕES)
+// ====================================================
+
+model Proposal {
+  id               Int       @id @default(autoincrement())
+  code             String    @unique
+  status           String    @default("NEW")
+  groupOrder       Int       @default(0)
+  
+  clientName       String
+  requesterName    String
+  requesterEmail   String
+  
+  deliveryDate     DateTime
+  serviceStartDate DateTime?
+  contractEndDate  DateTime?
+  
+  techLead         String
+  commLead         String
+  value            Decimal   @default(0.0)
+  
+  revision         Int       @default(0)
+  docsReceived     String
+  sharepointUrl    String?
+  
+  projectArea      String?
+  quantidade       Decimal?
+  unidadeMedida    String?
+  projectType      String?
+  observations     String?
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  revisions        ProposalRevision[]
+  auditLogs        ProposalAuditLog[]
+
+  @@map("propostas_comercial")
+}
+
+model ProposalRevision {
+  id             Int      @id @default(autoincrement())
+  proposalId     Int
+  proposal       Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  revisionNumber Int
+  snapshot       String
+  createdBy      String
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  @@map("propostas_revisao")
+}
+
+model ProposalAuditLog {
+  id         Int      @id @default(autoincrement())
+  proposalId Int
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  fieldName  String
+  oldValue   String?
+  newValue   String?
+  changedBy  String   @default("Sistema")
+  createdAt  DateTime @default(now())
+
+  @@map("propostas_audit_log")
 }

@@ -19,6 +19,8 @@ export default async function UsuariosPage() {
       email: true,
       role: true,
       ativo: true,
+      acessoOrcamento: true,
+      acessoMedicao: true,
       createdAt: true,
       _count: {
         select: {

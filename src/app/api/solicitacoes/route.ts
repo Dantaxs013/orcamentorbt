@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     const orcamento = await prisma.orcamento.create({
       data: {
         numeroProtocolo,
-        status: 'AGUARDANDO_CLIENTE',
+        status: 'EM_ANALISE',
         leadId: lead.id,
       },
     });
@@ -95,8 +95,8 @@ export async function POST(req: NextRequest) {
     await prisma.statusLog.create({
       data: {
         orcamentoId: orcamento.id,
-        statusNovo: 'AGUARDANDO_CLIENTE',
-        motivo: 'Solicitação inicial recebida. Magic Link gerado para o cliente.',
+        statusNovo: 'EM_ANALISE',
+        motivo: 'Nova proposta cadastrada pelo painel. Encaminhada para o bloco de análise.',
         usuarioNome: 'Sistema Automático',
       },
     });

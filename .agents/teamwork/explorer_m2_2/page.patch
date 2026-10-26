@@ -1,0 +1,48 @@
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -1,12 +1,39 @@
+ import { redirect } from 'next/navigation';
+ import { getServerSession } from '@/lib/session';
+ 
++export const dynamic = 'force-dynamic';
++export const revalidate = 0;
++
++/**
++ * Root Gateway Redirection ('/')
++ *
++ * Triages visitors based on authentication status and modular permissions:
++ * 1. Unauthenticated: -> /login (preserves security perimeter)
++ * 2. Dual-Module Access (Orçamentos + Medição): -> /portal (Institutional Selection Hub)
++ * 3. Single Access Orçamentos: -> /dashboard (Direct to Commercial Pipeline)
++ * 4. Single Access Medição: -> /medicao (Direct to Field Production RDP)
++ * 5. Zero Module Access: -> /login?error=no_modules (Defensive fallback)
++ */
+ export default async function HomePage() {
+   const session = await getServerSession();
+ 
+-  if (!session) {
++  if (!session || !session.user) {
+     redirect('/login');
+   }
+ 
+-  redirect('/dashboard');
++  const { acessoOrcamento, acessoMedicao } = session.user;
++
++  // 1. Dual-Module Access: Hub Institucional de Seleção
++  if (acessoOrcamento && acessoMedicao) {
++    redirect('/portal');
++  }
++
++  // 2. Acesso Exclusivo: Gestão de Orçamentos
++  if (acessoOrcamento && !acessoMedicao) {
++    redirect('/dashboard');
++  }
++
++  // 3. Acesso Exclusivo: Medição Diária (RDP)
++  if (!acessoOrcamento && acessoMedicao) {
++    redirect('/medicao');
++  }
++
++  // 4. Sem Módulos Habilitados: Redireciona com aviso explícito
++  redirect('/login?error=no_modules');
+ }

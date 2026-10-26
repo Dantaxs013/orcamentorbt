@@ -82,7 +82,7 @@ export function NovaSolicitacaoModal() {
 
       toast.success(
         'Solicitação Criada com Sucesso!',
-        `Protocolo ${data.orcamento.numeroProtocolo} gerado. Magic Link disponível.`
+        `Protocolo ${data.orcamento.numeroProtocolo} gerado e encaminhado para Em Análise.`
       );
 
       router.refresh();
@@ -111,7 +111,7 @@ export function NovaSolicitacaoModal() {
         className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#BA1A1A] hover:bg-[#991B1B] text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-red-950/20 transition-all hover:scale-[1.02]"
       >
         <PlusCircle className="w-4 h-4" />
-        <span>Nova Solicitação</span>
+        <span>Nova Proposta</span>
       </button>
 
       {isOpen && (
@@ -120,9 +120,9 @@ export function NovaSolicitacaoModal() {
             {/* Header */}
             <div className="bg-[#111827] p-5 text-white flex items-center justify-between border-b-2 border-[#BA1A1A]">
               <div>
-                <h3 className="text-base font-bold">Simular Nova Solicitação de Orçamento</h3>
+                <h3 className="text-base font-bold">Nova Proposta / Solicitação de Orçamento</h3>
                 <p className="text-xs text-slate-400">
-                  Cadastra o lead e dispara o Magic Link do formulário
+                  Cadastra a solicitação e encaminha diretamente para o bloco de análise
                 </p>
               </div>
               <button
@@ -141,7 +141,7 @@ export function NovaSolicitacaoModal() {
                   <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-sm">
                     <p className="font-bold flex items-center gap-1.5 text-emerald-800">
                       <Check className="w-4 h-4 text-emerald-600" />
-                      Solicitação e Magic Link Criados com Sucesso!
+                      Proposta Criada com Sucesso!
                     </p>
                     <p className="mt-1 text-xs text-emerald-700">
                       Protocolo: <strong className="font-mono text-emerald-900">{createdData.protocolo}</strong>
@@ -196,7 +196,7 @@ export function NovaSolicitacaoModal() {
                       onClick={fillSample}
                       className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline"
                     >
-                      Preencher Exemplo RBT
+                      Preencher Formulário da RBT
                     </button>
                   </div>
 
@@ -302,7 +302,7 @@ export function NovaSolicitacaoModal() {
                       disabled={loading}
                       className="px-5 py-2.5 bg-[#BA1A1A] hover:bg-[#991B1B] text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50 flex items-center gap-1.5"
                     >
-                      {loading ? 'Processando...' : 'Gerar Magic Link'}
+                      {loading ? 'Processando...' : 'Gerar Proposta'}
                     </button>
                   </div>
                 </form>

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getServerSession } from '@/lib/session';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, isAdmin } from '@/lib/auth';
 import { sendNovoUsuarioEmail } from '@/lib/email';
+import { createUserSchema } from '@/lib/validations/usuario.schema';
 
 /**
  * GET /api/usuarios
- * Retorna a lista de usuários cadastrados (Orçamentistas e Gestores)
+ * Retorna a lista de usuários cadastrados com permissões modulares
  */
 export async function GET() {
   const session = await getServerSession();
@@ -22,6 +23,8 @@ export async function GET() {
         email: true,
         role: true,
         ativo: true,
+        acessoOrcamento: true,
+        acessoMedicao: true,
         createdAt: true,
         _count: {
           select: {
@@ -41,7 +44,7 @@ export async function GET() {
 
 /**
  * POST /api/usuarios
- * Cria um novo usuário (Orçamentista ou Gestor/ADMIN)
+ * Cria um novo usuário com validação de permissões de módulos (>= 1 módulo obrigatório)
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession();
@@ -49,8 +52,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Acesso restrito. Faça login.' }, { status: 401 });
   }
 
-  // Apenas ADMIN pode cadastrar novos usuários
-  if (session.user.role !== 'ADMIN') {
+  // Apenas Gestores (ADMIN / ADMINISTRADOR) podem cadastrar novos usuários
+  if (!isAdmin(session.user.role)) {
     return NextResponse.json(
       { error: 'Apenas Gestores (ADMIN) possuem permissão para criar novos usuários.' },
       { status: 403 }
@@ -59,21 +62,26 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, email, password, role } = body;
+    const parseResult = createUserSchema.safeParse(body);
 
-    if (!name || !email || !password) {
+    if (!parseResult.success) {
+      const issue = parseResult.error.issues[0];
       return NextResponse.json(
-        { error: 'Nome, e-mail e senha são obrigatórios.' },
+        { error: issue?.message || 'Dados de usuário inválidos.' },
         { status: 400 }
       );
     }
 
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: 'A senha deve conter no mínimo 6 caracteres.' },
-        { status: 400 }
-      );
-    }
+    const {
+      name,
+      email,
+      password,
+      role,
+      telefone,
+      ativo,
+      acessoOrcamento,
+      acessoMedicao,
+    } = parseResult.data;
 
     const emailNormalizado = email.toLowerCase().trim();
     const existing = await prisma.user.findUnique({
@@ -87,7 +95,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const validRole = role === 'ADMIN' ? 'ADMIN' : 'ORCAMENTISTA';
     const passwordHash = await hashPassword(password);
 
     const novoUsuario = await prisma.user.create({
@@ -95,8 +102,11 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         email: emailNormalizado,
         passwordHash,
-        role: validRole,
-        ativo: true,
+        role,
+        telefone: telefone || null,
+        ativo: ativo ?? true,
+        acessoOrcamento,
+        acessoMedicao,
       },
       select: {
         id: true,
@@ -104,11 +114,21 @@ export async function POST(req: NextRequest) {
         email: true,
         role: true,
         ativo: true,
+        acessoOrcamento: true,
+        acessoMedicao: true,
         createdAt: true,
       },
     });
 
-    // Disparar e-mail de boas-vindas com as credenciais e logo
+    // Mapeamento amigável de perfil para e-mail institucional
+    const perfilMap: Record<string, string> = {
+      ADMIN: 'Gestor (ADMIN)',
+      ADMINISTRADOR: 'Gestor (ADMIN)',
+      ORCAMENTISTA: 'Engenheiro Orçamentista',
+      ENGENHEIRO: 'Engenheiro de Obras',
+      APONTADOR: 'Apontador de Campo',
+    };
+
     const baseUrl = process.env.APP_URL || 'https://orcamentos.rbtfundacoes.com.br';
     const loginUrl = `${baseUrl}/login`;
 
@@ -117,7 +137,7 @@ export async function POST(req: NextRequest) {
       nome: novoUsuario.name,
       email: novoUsuario.email,
       senhaTemporaria: password,
-      perfil: validRole === 'ADMIN' ? 'Gestor (ADMIN)' : 'Engenheiro Orçamentista',
+      perfil: perfilMap[novoUsuario.role] || novoUsuario.role,
       loginUrl,
     }).catch((err) => {
       console.error('Falha ao enviar e-mail de novo usuário (não bloqueante):', err);

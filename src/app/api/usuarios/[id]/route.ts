@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getServerSession } from '@/lib/session';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, isAdmin } from '@/lib/auth';
+import { updateUserSchema } from '@/lib/validations/usuario.schema';
 
 interface RouteContext {
   params: {
@@ -11,7 +12,8 @@ interface RouteContext {
 
 /**
  * PATCH /api/usuarios/[id]
- * Atualiza o perfil (role: ADMIN / ORCAMENTISTA), status ativo ou senha do usuário
+ * Atualiza dados, papéis e permissões modulares de acesso (acessoOrcamento, acessoMedicao).
+ * Protegido contra auto-bloqueio do admin em sessão.
  */
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const session = await getServerSession();
@@ -19,7 +21,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Acesso restrito. Faça login.' }, { status: 401 });
   }
 
-  if (session.user.role !== 'ADMIN') {
+  if (!isAdmin(session.user.role)) {
     return NextResponse.json(
       { error: 'Apenas Gestores (ADMIN) possuem permissão para alterar usuários.' },
       { status: 403 }
@@ -29,7 +31,17 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   try {
     const { id } = params;
     const body = await req.json();
-    const { role, ativo, name, password } = body;
+
+    const parseResult = updateUserSchema.safeParse(body);
+    if (!parseResult.success) {
+      const issue = parseResult.error.issues[0];
+      return NextResponse.json(
+        { error: issue?.message || 'Dados de atualização inválidos.' },
+        { status: 400 }
+      );
+    }
+
+    const data = parseResult.data;
 
     const user = await prisma.user.findUnique({
       where: { id },
@@ -39,29 +51,71 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
     }
 
-    const dataToUpdate: any = {};
+    // Calcula os estados finais de permissão após o merge com o estado atual do banco
+    const targetOrcamento =
+      typeof data.acessoOrcamento === 'boolean'
+        ? data.acessoOrcamento
+        : user.acessoOrcamento;
+    const targetMedicao =
+      typeof data.acessoMedicao === 'boolean'
+        ? data.acessoMedicao
+        : user.acessoMedicao;
 
-    if (role && (role === 'ADMIN' || role === 'ORCAMENTISTA')) {
-      dataToUpdate.role = role;
+    // REGRA UNIVERSAL: Pelo menos um módulo de acesso deve ser mantido
+    if (!targetOrcamento && !targetMedicao) {
+      return NextResponse.json(
+        {
+          error:
+            'Pelo menos um módulo de acesso deve ser selecionado (Orçamentos ou Medição Diária).',
+        },
+        { status: 400 }
+      );
     }
 
-    if (typeof ativo === 'boolean') {
-      // Impede desativar a própria conta do gestor que está operando
-      if (id === session.user.id && !ativo) {
+    // PROTEÇÃO ATIVA DE AUTO-BLOQUEIO DO GESTOR LOGADO
+    if (id === session.user.id) {
+      if (typeof data.ativo === 'boolean' && !data.ativo) {
         return NextResponse.json(
           { error: 'Você não pode desativar o seu próprio usuário atual.' },
           { status: 400 }
         );
       }
-      dataToUpdate.ativo = ativo;
+      if (!targetOrcamento && !targetMedicao) {
+        return NextResponse.json(
+          { error: 'Você não pode revogar todos os seus próprios acessos a módulos.' },
+          { status: 400 }
+        );
+      }
+      if (data.role && !isAdmin(data.role)) {
+        return NextResponse.json(
+          { error: 'Você não pode rebaixar o seu próprio perfil de Administrador.' },
+          { status: 400 }
+        );
+      }
     }
 
-    if (name && typeof name === 'string') {
-      dataToUpdate.name = name.trim();
-    }
+    const dataToUpdate: Record<string, any> = {};
 
-    if (password && typeof password === 'string' && password.length >= 6) {
-      dataToUpdate.passwordHash = await hashPassword(password);
+    if (data.name !== undefined) {
+      dataToUpdate.name = data.name.trim();
+    }
+    if (data.role !== undefined) {
+      dataToUpdate.role = data.role;
+    }
+    if (typeof data.ativo === 'boolean') {
+      dataToUpdate.ativo = data.ativo;
+    }
+    if (data.telefone !== undefined) {
+      dataToUpdate.telefone = data.telefone;
+    }
+    if (typeof data.acessoOrcamento === 'boolean') {
+      dataToUpdate.acessoOrcamento = data.acessoOrcamento;
+    }
+    if (typeof data.acessoMedicao === 'boolean') {
+      dataToUpdate.acessoMedicao = data.acessoMedicao;
+    }
+    if (data.password && data.password.trim().length >= 6) {
+      dataToUpdate.passwordHash = await hashPassword(data.password.trim());
     }
 
     const updated = await prisma.user.update({
@@ -73,6 +127,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         email: true,
         role: true,
         ativo: true,
+        acessoOrcamento: true,
+        acessoMedicao: true,
         updatedAt: true,
       },
     });
@@ -101,7 +157,7 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Acesso restrito. Faça login.' }, { status: 401 });
   }
 
-  if (session.user.role !== 'ADMIN') {
+  if (!isAdmin(session.user.role)) {
     return NextResponse.json(
       { error: 'Apenas Gestores (ADMIN) possuem permissão para excluir usuários.' },
       { status: 403 }
@@ -127,7 +183,6 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
     }
 
-    // Exclui o usuário (sessões são deletadas em cascata; orçamentos e logs ficam desvinculados com SetNull)
     await prisma.user.delete({
       where: { id },
     });
@@ -144,4 +199,3 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     );
   }
 }
-

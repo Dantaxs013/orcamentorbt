@@ -16,29 +16,36 @@ import {
   X,
   Search,
   Trash2,
+  Calculator,
+  HardHat,
+  Pencil,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast-provider';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 
-interface Usuario {
+export interface Usuario {
   id: string;
   name: string;
   email: string;
   role: string;
   ativo: boolean;
+  acessoOrcamento: boolean;
+  acessoMedicao: boolean;
   createdAt: string | Date;
   _count?: {
     orcamentos: number;
   };
 }
 
-interface UsuariosClientProps {
+export interface UsuariosClientProps {
   initialUsers: Usuario[];
   currentUser: {
     id: string;
     name: string;
     email: string;
     role: string;
+    acessoOrcamento?: boolean;
+    acessoMedicao?: boolean;
   };
 }
 
@@ -56,6 +63,20 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
     email: '',
     password: '',
     role: 'ORCAMENTISTA' as 'ADMIN' | 'ORCAMENTISTA',
+    acessoOrcamento: true,
+    acessoMedicao: false,
+  });
+
+  // Modal Editar Usuário
+  const [editingUser, setEditingUser] = useState<Usuario | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    role: 'ORCAMENTISTA' as 'ADMIN' | 'ORCAMENTISTA',
+    ativo: true,
+    acessoOrcamento: true,
+    acessoMedicao: false,
+    password: '',
   });
 
   // Atualização inline de status/perfil
@@ -82,6 +103,19 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
       return;
     }
 
+    if (createForm.password.length < 6) {
+      toast.warning('Senha Curta', 'A senha provisória deve conter no mínimo 6 caracteres.');
+      return;
+    }
+
+    if (!createForm.acessoOrcamento && !createForm.acessoMedicao) {
+      toast.warning(
+        'Módulo Obrigatório',
+        'Selecione pelo menos um módulo de acesso (Orçamentos ou Medição Diária).'
+      );
+      return;
+    }
+
     setCreating(true);
     try {
       const res = await fetch('/api/usuarios', {
@@ -100,7 +134,7 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
 
       toast.success(
         'Usuário Criado!',
-        `${data.user.name} cadastrado com perfil ${data.user.role === 'ADMIN' ? 'Gestor' : 'Orçamentista'}.`
+        `${data.user.name} cadastrado com sucesso.`
       );
 
       setUsers([data.user, ...users]);
@@ -110,11 +144,112 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
         email: '',
         password: '',
         role: 'ORCAMENTISTA',
+        acessoOrcamento: true,
+        acessoMedicao: false,
       });
     } catch {
       toast.error('Erro de Conexão', 'Não foi possível conectar ao servidor.');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleOpenEdit = (user: Usuario) => {
+    setEditingUser(user);
+    setEditForm({
+      name: user.name,
+      role: (user.role === 'ADMIN' ? 'ADMIN' : 'ORCAMENTISTA') as 'ADMIN' | 'ORCAMENTISTA',
+      ativo: user.ativo,
+      acessoOrcamento: Boolean(user.acessoOrcamento),
+      acessoMedicao: Boolean(user.acessoMedicao),
+      password: '',
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    if (!editForm.name.trim()) {
+      toast.warning('Campo Obrigatório', 'O nome do usuário não pode ficar vazio.');
+      return;
+    }
+
+    const isEditingSelf = editingUser.id === currentUser.id;
+
+    // Proteção contra autorrevogação do próprio gestor
+    if (isEditingSelf && !editForm.ativo) {
+      toast.warning('Ação Não Permitida', 'Você não pode desativar o seu próprio usuário logado.');
+      return;
+    }
+
+    if (isEditingSelf && editForm.role !== 'ADMIN') {
+      toast.warning('Ação Não Permitida', 'Você não pode remover o perfil de Gestor da sua própria conta.');
+      return;
+    }
+
+    if (isEditingSelf && !editForm.acessoOrcamento) {
+      toast.warning(
+        'Ação Não Permitida',
+        'Você não pode revogar seu próprio acesso ao módulo de Orçamentos enquanto opera nesta sessão.'
+      );
+      return;
+    }
+
+    if (!editForm.acessoOrcamento && !editForm.acessoMedicao) {
+      toast.warning(
+        'Módulo Obrigatório',
+        'O usuário deve possuir acesso a pelo menos um módulo do sistema (Orçamentos ou Medição Diária).'
+      );
+      return;
+    }
+
+    if (editForm.password && editForm.password.trim().length < 6) {
+      toast.warning('Senha Curta', 'A nova senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const payload: Record<string, any> = {
+        name: editForm.name.trim(),
+        role: editForm.role,
+        ativo: editForm.ativo,
+        acessoOrcamento: editForm.acessoOrcamento,
+        acessoMedicao: editForm.acessoMedicao,
+      };
+
+      if (editForm.password && editForm.password.trim().length >= 6) {
+        payload.password = editForm.password.trim();
+      }
+
+      const res = await fetch(`/api/usuarios/${editingUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error('Erro ao Atualizar', data.error || 'Falha ao salvar alterações.');
+        return;
+      }
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === editingUser.id ? { ...u, ...data.user } : u))
+      );
+
+      toast.success(
+        'Dados Atualizados!',
+        `As permissões e dados de ${editForm.name} foram salvos com sucesso.`
+      );
+
+      setEditingUser(null);
+    } catch {
+      toast.error('Erro de Conexão', 'Não foi possível atualizar o usuário.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -231,7 +366,7 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Controle de acesso da equipe RBT: defina quem é <strong>Orçamentista</strong> e quem é <strong>Gestor</strong>.
+            Controle de acesso modular da equipe RBT: gerencie perfis, status e permissões aos sistemas de <strong>Orçamentos</strong> e <strong>Medição Diária (RDP)</strong>.
           </p>
         </div>
 
@@ -308,6 +443,7 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
               <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <th className="py-3 px-4 sm:px-6">Usuário</th>
                 <th className="py-3 px-4">Função / Perfil</th>
+                <th className="py-3 px-4">Módulos Habilitados</th>
                 <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-center">Orçamentos Vinculados</th>
                 <th className="py-3 px-4 text-right">Cadastrado em</th>
@@ -317,7 +453,7 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400">
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
                     Nenhum usuário encontrado com os filtros atuais.
                   </td>
                 </tr>
@@ -399,6 +535,39 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
                         )}
                       </td>
 
+                      {/* Módulos Habilitados */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {user.acessoOrcamento && (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-50 text-[#BA1A1A] border border-red-200 shadow-2xs"
+                              title="Acesso liberado à Gestão de Orçamentos"
+                            >
+                              <Calculator className="w-3.5 h-3.5 text-[#BA1A1A]" />
+                              <span>Orçamentos</span>
+                            </span>
+                          )}
+                          {user.acessoMedicao && (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-300 shadow-2xs"
+                              title="Acesso liberado à Medição Diária (RDP)"
+                            >
+                              <HardHat className="w-3.5 h-3.5 text-slate-800" />
+                              <span>Medição</span>
+                            </span>
+                          )}
+                          {!user.acessoOrcamento && !user.acessoMedicao && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200"
+                              title="Nenhum módulo liberado"
+                            >
+                              <AlertCircle className="w-3 h-3 text-amber-500" />
+                              <span>Sem módulo</span>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
                       {/* Status Ativo / Inativo */}
                       <td className="py-3.5 px-4 text-center">
                         {isGestor && !isCurrent ? (
@@ -450,30 +619,45 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
                       {/* Ações */}
                       {isGestor && (
                         <td className="py-3.5 px-4 sm:px-6 text-right">
-                          {!isCurrent ? (
-                            <div className="flex items-center justify-end gap-3">
-                              <button
-                                type="button"
-                                onClick={() => handleToggleAtivo(user.id, user.ativo)}
-                                disabled={isUpdating}
-                                className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline transition cursor-pointer"
-                              >
-                                {user.ativo ? 'Desativar' : 'Reativar'}
-                              </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(user)}
+                              disabled={isUpdating}
+                              className="px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                              title={`Editar perfil e permissões de ${user.name}`}
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                              <span>Editar</span>
+                            </button>
 
-                              <button
-                                type="button"
-                                onClick={() => setUserToDelete(user)}
-                                disabled={isUpdating}
-                                className="p-1 text-slate-400 hover:text-[#BA1A1A] hover:bg-red-50 rounded-lg transition cursor-pointer"
-                                title={`Excluir definitivamente ${user.name}`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-slate-400 font-medium">Você (ativo)</span>
-                          )}
+                            {!isCurrent ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleAtivo(user.id, user.ativo)}
+                                  disabled={isUpdating}
+                                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline transition cursor-pointer px-1"
+                                >
+                                  {user.ativo ? 'Desativar' : 'Reativar'}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setUserToDelete(user)}
+                                  disabled={isUpdating}
+                                  className="p-1.5 text-slate-400 hover:text-[#BA1A1A] hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                  title={`Excluir definitivamente ${user.name}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-semibold">
+                                Você
+                              </span>
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -488,7 +672,7 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
       {/* Modal Criar Novo Usuário */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 text-slate-900 space-y-5">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 text-slate-900 space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-red-100 text-[#BA1A1A] flex items-center justify-center">
@@ -499,7 +683,7 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
                     Cadastrar Usuário da Equipe
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Adicione um novo Orçamentista ou Gestor ao sistema.
+                    Adicione um novo colaborador e configure o acesso aos módulos RBT.
                   </p>
                 </div>
               </div>
@@ -616,6 +800,79 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
                 </div>
               </div>
 
+              {/* Módulos Habilitados */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Módulos do Sistema Habilitados *
+                </label>
+                <p className="text-[11px] text-slate-500 mb-2.5 leading-snug">
+                  Selecione os módulos corporativos que o usuário poderá acessar. É obrigatório selecionar ao menos um módulo.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Card Orçamentos */}
+                  <label
+                    className={`p-3 rounded-2xl border flex items-start gap-3 cursor-pointer transition select-none ${
+                      createForm.acessoOrcamento
+                        ? 'border-red-300 bg-red-50/50 text-slate-900 ring-2 ring-[#BA1A1A]/20'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-slate-50/50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={createForm.acessoOrcamento}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, acessoOrcamento: e.target.checked })
+                      }
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#BA1A1A] focus:ring-[#BA1A1A]"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Calculator className="w-3.5 h-3.5 text-[#BA1A1A]" />
+                        <span className="text-xs font-bold text-slate-900">Gestão de Orçamentos</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                        Quadro Kanban, propostas comerciais e cálculo de fundações
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Card Medição */}
+                  <label
+                    className={`p-3 rounded-2xl border flex items-start gap-3 cursor-pointer transition select-none ${
+                      createForm.acessoMedicao
+                        ? 'border-slate-400 bg-slate-100 text-slate-900 ring-2 ring-slate-900/20'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-slate-50/50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={createForm.acessoMedicao}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, acessoMedicao: e.target.checked })
+                      }
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#111827] focus:ring-slate-900"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <HardHat className="w-3.5 h-3.5 text-slate-800" />
+                        <span className="text-xs font-bold text-slate-900">Medição Diária (RDP)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                        Apontamento em canteiro de obras, estacas e boletins de medição
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {!createForm.acessoOrcamento && !createForm.acessoMedicao && (
+                  <div className="flex items-center gap-2 mt-2.5 p-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
+                    <span>Selecione pelo menos um módulo para poder cadastrar o usuário.</span>
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -626,7 +883,7 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
                 </button>
                 <button
                   type="submit"
-                  disabled={creating}
+                  disabled={creating || (!createForm.acessoOrcamento && !createForm.acessoMedicao)}
                   className="px-5 py-2.5 bg-[#BA1A1A] hover:bg-[#991B1B] text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer disabled:opacity-50"
                 >
                   {creating ? (
@@ -634,6 +891,294 @@ export function UsuariosClient({ initialUsers, currentUser }: UsuariosClientProp
                   ) : (
                     <>
                       <span>Salvar Usuário</span>
+                      <CheckCircle2 className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Usuário e Permissões */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 text-slate-900 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center border border-slate-200">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Editar Perfil & Permissões
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {editingUser.email}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editingUser.id === currentUser.id && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-bold">Você está editando a sua própria conta ativa</p>
+                  <p className="text-[11px] text-amber-700 leading-snug">
+                    Para proteger sua sessão contra travamento acidental, a função de Gestor,
+                    o status ativo e a permissão do módulo Orçamentos estão fixados.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Nome Completo */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Nome Completo *
+                </label>
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    required
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#BA1A1A]"
+                  />
+                </div>
+              </div>
+
+              {/* Perfil / Função */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Perfil de Acesso (Função) *
+                </label>
+                {editingUser.id === currentUser.id ? (
+                  <div className="p-2.5 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-amber-600" />
+                      Gestor (ADMIN)
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-semibold">🔒 Bloqueado para o próprio usuário</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <label
+                      className={`p-3 rounded-xl border flex flex-col items-center text-center gap-1 cursor-pointer transition ${
+                        editForm.role === 'ORCAMENTISTA'
+                          ? 'border-blue-500 bg-blue-50/50 text-blue-900 ring-2 ring-blue-500'
+                          : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="edit-role"
+                        value="ORCAMENTISTA"
+                        checked={editForm.role === 'ORCAMENTISTA'}
+                        onChange={() => setEditForm({ ...editForm, role: 'ORCAMENTISTA' })}
+                        className="sr-only"
+                      />
+                      <Briefcase className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-bold">Orçamentista</span>
+                    </label>
+
+                    <label
+                      className={`p-3 rounded-xl border flex flex-col items-center text-center gap-1 cursor-pointer transition ${
+                        editForm.role === 'ADMIN'
+                          ? 'border-amber-500 bg-amber-50/50 text-amber-900 ring-2 ring-amber-500'
+                          : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="edit-role"
+                        value="ADMIN"
+                        checked={editForm.role === 'ADMIN'}
+                        onChange={() => setEditForm({ ...editForm, role: 'ADMIN' })}
+                        className="sr-only"
+                      />
+                      <Shield className="w-4 h-4 text-amber-600" />
+                      <span className="text-xs font-bold">Gestor (ADMIN)</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Status Ativo / Inativo */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Status da Conta *
+                </label>
+                {editingUser.id === currentUser.id ? (
+                  <div className="p-2.5 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                    <span className="font-bold text-emerald-700 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Ativo
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-semibold">🔒 Bloqueado para o próprio usuário</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, ativo: true })}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 ${
+                        editForm.ativo
+                          ? 'border-emerald-400 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-400'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>Ativo</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, ativo: false })}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 ${
+                        !editForm.ativo
+                          ? 'border-red-400 bg-red-50 text-red-800 ring-2 ring-red-400'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                      <span>Inativo</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Módulos Habilitados */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Módulos Habilitados *
+                </label>
+                <p className="text-[11px] text-slate-500 mb-2.5">
+                  Defina o acesso às plataformas corporativas. O usuário deve manter ao menos um módulo ativo.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Card Orçamentos */}
+                  <label
+                    className={`p-3 rounded-2xl border flex items-start gap-3 transition select-none ${
+                      editingUser.id === currentUser.id
+                        ? 'border-red-200 bg-red-50/30 opacity-90 cursor-not-allowed'
+                        : editForm.acessoOrcamento
+                        ? 'border-red-300 bg-red-50/50 ring-2 ring-[#BA1A1A]/20 cursor-pointer'
+                        : 'border-slate-200 hover:border-slate-300 bg-slate-50/50 cursor-pointer'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={editForm.acessoOrcamento}
+                      disabled={editingUser.id === currentUser.id}
+                      onChange={(e) => {
+                        if (editingUser.id === currentUser.id) return;
+                        setEditForm({ ...editForm, acessoOrcamento: e.target.checked });
+                      }}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#BA1A1A] focus:ring-[#BA1A1A] disabled:opacity-60"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Calculator className="w-3.5 h-3.5 text-[#BA1A1A]" />
+                        <span className="text-xs font-bold text-slate-900">Gestão de Orçamentos</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                        Pipeline comercial e propostas técnicas
+                      </p>
+                      {editingUser.id === currentUser.id && (
+                        <p className="text-[10px] text-amber-700 font-semibold mt-1">
+                          🔒 Acesso obrigatório mantido
+                        </p>
+                      )}
+                    </div>
+                  </label>
+
+                  {/* Card Medição */}
+                  <label
+                    className={`p-3 rounded-2xl border flex items-start gap-3 cursor-pointer transition select-none ${
+                      editForm.acessoMedicao
+                        ? 'border-slate-400 bg-slate-100 ring-2 ring-slate-900/20'
+                        : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={editForm.acessoMedicao}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, acessoMedicao: e.target.checked })
+                      }
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#111827] focus:ring-slate-900"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <HardHat className="w-3.5 h-3.5 text-slate-800" />
+                        <span className="text-xs font-bold text-slate-900">Medição Diária (RDP)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                        Apontamentos de obras e boletins
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {!editForm.acessoOrcamento && !editForm.acessoMedicao && (
+                  <div className="flex items-center gap-2 mt-2.5 p-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
+                    <span>O usuário deve possuir acesso a pelo menos um módulo do sistema.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Redefinição de Senha (Opcional) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Redefinir Senha <span className="text-slate-400 font-normal lowercase">(opcional)</span>
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="password"
+                    minLength={6}
+                    value={editForm.password}
+                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                    placeholder="Deixe em branco para manter a senha atual"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#BA1A1A]"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Preencha apenas se desejar alterar a senha deste usuário (mínimo de 6 caracteres).
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit || (!editForm.acessoOrcamento && !editForm.acessoMedicao)}
+                  className="px-5 py-2.5 bg-[#BA1A1A] hover:bg-[#991B1B] text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  {savingEdit ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>Salvar Alterações</span>
                       <CheckCircle2 className="w-4 h-4" />
                     </>
                   )}

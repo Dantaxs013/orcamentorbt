@@ -1,0 +1,97 @@
+--- a/src/components/layout/dashboard-shell.tsx
++++ b/src/components/layout/dashboard-shell.tsx
+@@ -17,11 +17,14 @@
+   User as UserIcon,
+   ChevronRight,
+   Users,
++  LayoutGrid,
+ } from 'lucide-react';
+ 
+ interface UserSession {
+   id: string;
+   name: string;
+   email: string;
+   role: string;
++  acessoOrcamento?: boolean;
++  acessoMedicao?: boolean;
+ }
+ 
+@@ -56,5 +59,7 @@
+   const [mobileOpen, setMobileOpen] = useState(false);
+   const pathname = usePathname();
+ 
++  const hasDualAccess = Boolean(user.acessoOrcamento && user.acessoMedicao);
++
+   const isLinkActive = (href: string) => {
+     if (href === '/dashboard') {
+@@ -118,5 +123,23 @@
+             })}
+           </nav>
++
++          {/* Module Switcher Shortcut (Dual-Access Users) */}
++          {hasDualAccess && (
++            <div className="pt-4 mt-4 border-t border-slate-800/80">
++              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 pb-2">
++                Portal Unificado
++              </div>
++              <Link
++                href="/portal"
++                className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-slate-300 hover:text-white hover:bg-white/10 transition border border-slate-800 hover:border-slate-700 bg-slate-900/60 group shadow-sm"
++                title="Voltar ao Portal de Módulos RBT"
++              >
++                <div className="w-6 h-6 rounded-lg bg-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 group-hover:bg-red-600/30 transition-colors">
++                  <LayoutGrid className="w-3.5 h-3.5 text-red-400 group-hover:text-red-300" />
++                </div>
++                <span className="truncate">Trocar Módulo</span>
++                <ChevronRight className="w-4 h-4 ml-auto text-slate-500 group-hover:text-white flex-shrink-0" />
++              </Link>
++            </div>
++          )}
+         </div>
+ 
+@@ -207,5 +230,22 @@
+                     </Link>
+                   );
+                 })}
++
++                {/* Mobile Module Switcher */}
++                {hasDualAccess && (
++                  <div className="pt-4 mt-4 border-t border-slate-800/80">
++                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 pb-2">
++                      Portal Unificado
++                    </div>
++                    <Link
++                      href="/portal"
++                      onClick={() => setMobileOpen(false)}
++                      className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-white/10 transition border border-slate-800 bg-slate-900/60"
++                      title="Voltar ao Portal de Módulos RBT"
++                    >
++                      <div className="w-6 h-6 rounded-lg bg-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0">
++                        <LayoutGrid className="w-3.5 h-3.5 text-red-400" />
++                      </div>
++                      <span>Trocar Módulo</span>
++                    </Link>
++                  </div>
++                )}
+               </nav>
+             </div>
+@@ -265,5 +305,17 @@
+           </div>
+ 
+-          {/* Right Side: User profile badge & Quick Logout */}
+-          <div className="flex items-center gap-3">
++          {/* Right Side: Module Switcher (if dual access), User profile badge & Quick Logout */}
++          <div className="flex items-center gap-2 sm:gap-3">
++            {hasDualAccess && (
++              <Link
++                href="/portal"
++                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-[#BA1A1A]/20"
++                title="Voltar à seleção de módulos do Portal Unificado"
++              >
++                <LayoutGrid className="w-3.5 h-3.5 text-[#BA1A1A] flex-shrink-0" />
++                <span className="hidden sm:inline">Trocar Módulo</span>
++                <span className="sm:hidden text-[11px]">Módulos</span>
++              </Link>
++            )}
++
+             <div className="hidden sm:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-xs">

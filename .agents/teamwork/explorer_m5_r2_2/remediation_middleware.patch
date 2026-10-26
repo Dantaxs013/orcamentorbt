@@ -1,0 +1,54 @@
+--- a/src/middleware.ts
++++ b/src/middleware.ts
+@@ -41,7 +41,14 @@
+     const parsed = JSON.parse(dec.decode(bytes));
++    const now = Date.now();
++    const maxClockSkewMs = 60 * 1000; // Tolerância máxima de 60s para clock drift futuro
+     const maxAgeMs = 12 * 60 * 60 * 1000;
+-    if (!parsed.ts || typeof parsed.ts !== 'number' || (Date.now() - parsed.ts) > maxAgeMs) {
++    if (
++      !parsed.ts ||
++      typeof parsed.ts !== 'number' ||
++      parsed.ts > now + maxClockSkewMs ||
++      (now - parsed.ts) > maxAgeMs
++    ) {
+       return null;
+     }
+     return parsed;
+@@ -274,8 +281,8 @@
+     }
+ 
+-    // Compatibilidade retroativa com sessões legadas / mocks onde userMetaToken está ausente ou expirado
+-    // Se a sessão SQLite existir no cookie e a rota for /dashboard/*, permite pass-through aos Server Components
+-    if (hasSession && !claims && request.nextUrl.pathname.startsWith('/dashboard')) {
++    // Compatibilidade retroativa com sessões legadas onde userMetaToken está TOTALMENTE AUSENTE
++    // Se a sessão SQLite existir no cookie, userMetaToken NÃO foi enviado, e a rota for /dashboard/*, permite pass-through aos Server Components
++    if (hasSession && !userMetaToken && request.nextUrl.pathname.startsWith('/dashboard')) {
+       claims = {
+         userId: 'legacy_user',
+         role: 'ORCAMENTISTA',
+@@ -294,9 +301,23 @@
+   if (hasSession && userMetaToken) {
+     previewClaims = parsePayloadUnsafe(userMetaToken);
++
++    // Hardening: Nunca confiar em parsePayloadUnsafe para conceder privilégios elevados
++    // Em rotas administrativas (/medicao/admin/*, /api/admin/*), tokens não verificados
++    // não podem reivindicar acesso de administrador. Apenas perfis restritos conhecidos
++    // (APONTADOR, ENGENHEIRO) seguem para seus devidos redirecionamentos de perímetro;
++    // qualquer outra claim não verificada é invalidada (previewClaims = null) forçando
++    // redirecionamento seguro para /login (307) ou 401 Unauthorized.
++    if (previewClaims) {
++      const pRole = String(previewClaims.role || '').toUpperCase();
++      const isElevatedRoute =
++        request.nextUrl.pathname.startsWith('/medicao/admin') ||
++        request.nextUrl.pathname.startsWith('/api/admin');
++
++      if (isElevatedRoute && pRole !== 'APONTADOR' && pRole !== 'ENGENHEIRO') {
++        previewClaims = null;
++      }
++    }
+   }
+-  if (hasSession && !previewClaims && request.nextUrl.pathname.startsWith('/dashboard')) {
++  if (hasSession && !userMetaToken && request.nextUrl.pathname.startsWith('/dashboard')) {
+     previewClaims = { role: 'ORCAMENTISTA', acessoOrcamento: true, acessoMedicao: false };
+   }

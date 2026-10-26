@@ -362,3 +362,149 @@ export async function sendNovoUsuarioEmail({
     return { success: false };
   }
 }
+
+// ====================================================
+// NOVO LEAD HELPER (Orçamentos)
+// ====================================================
+export interface NovoLeadEmailProps {
+  to: string;
+  leadNome: string;
+  protocolo: string;
+  telefone?: string;
+  empresa?: string;
+  tipoFundacao?: string;
+}
+
+export async function sendNovoLeadEmail(props: NovoLeadEmailProps): Promise<{ success: boolean }> {
+  const transporter = getMailTransporter();
+  const from = process.env.SMTP_FROM || 'RBT Fundações <noreply@rbtfundacoes.com.br>';
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+      <div style="background:#111827;border-bottom:3px solid #BA1A1A;color:white;padding:20px;border-radius:8px 8px 0 0">
+        <h2 style="margin:0">RBT Fundações — Novo Lead Registrado</h2>
+      </div>
+      <div style="padding:20px;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px">
+        <p>Um novo lead de orçamento foi recebido:</p>
+        <table style="width:100%;border-collapse:collapse">
+          <tr><td style="padding:8px;font-weight:bold;color:#555">Protocolo:</td><td style="padding:8px">${props.protocolo}</td></tr>
+          <tr style="background:#f5f5f5"><td style="padding:8px;font-weight:bold;color:#555">Nome:</td><td style="padding:8px">${props.leadNome}</td></tr>
+          ${props.empresa ? `<tr><td style="padding:8px;font-weight:bold;color:#555">Empresa:</td><td style="padding:8px">${props.empresa}</td></tr>` : ''}
+          ${props.telefone ? `<tr style="background:#f5f5f5"><td style="padding:8px;font-weight:bold;color:#555">Telefone:</td><td style="padding:8px">${props.telefone}</td></tr>` : ''}
+          ${props.tipoFundacao ? `<tr><td style="padding:8px;font-weight:bold;color:#555">Fundação:</td><td style="padding:8px">${props.tipoFundacao}</td></tr>` : ''}
+        </table>
+      </div>
+    </div>
+  `;
+
+  if (!transporter) {
+    console.log(`[EMAIL MOCK] Para: ${props.to} | Novo Lead: ${props.protocolo}`);
+    return { success: true };
+  }
+
+  try {
+    await transporter.sendMail({
+      from,
+      to: props.to,
+      subject: `[RBT Fundações] Novo Lead Recebido - ${props.protocolo}`,
+      html,
+    });
+    return { success: true };
+  } catch (err) {
+    console.error('Erro ao enviar e-mail de novo lead:', err);
+    return { success: false };
+  }
+}
+
+// ====================================================
+// GENERIC EMAIL SENDER (Shared with Medição Diária)
+// ====================================================
+export interface GenericEmailPayload {
+  to: string;
+  subject: string;
+  html: string;
+}
+
+export async function sendEmail({ to, subject, html }: GenericEmailPayload): Promise<void> {
+  const transporter = getMailTransporter();
+  const from = process.env.SMTP_FROM || 'RBT Fundações <noreply@rbtfundacoes.com.br>';
+
+  if (!transporter) {
+    console.log(`[EMAIL MOCK] Para: ${to} | Assunto: ${subject}`);
+    return;
+  }
+
+  try {
+    await transporter.sendMail({ from, to, subject, html });
+  } catch (err) {
+    console.error('[EMAIL ERROR]', err);
+  }
+}
+
+// ====================================================
+// MEDIÇÃO DIÁRIA NOTIFICATIONS
+// ====================================================
+export async function notifyEngenheiroRdpSubmetido(
+  engEmail: string,
+  rdpInfo: { obra: string; data: string; apontador: string; totalEstacas: number; rdpId: string }
+) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  await sendEmail({
+    to: engEmail,
+    subject: `[RBT] Novo RDP submetido — ${rdpInfo.obra}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <div style="background:#111827;border-bottom:3px solid #BA1A1A;color:white;padding:20px;border-radius:8px 8px 0 0">
+          <h2 style="margin:0">RBT Fundações — Novo Relatório Diário</h2>
+        </div>
+        <div style="padding:20px;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px">
+          <p>Um novo Relatório Diário de Produção foi submetido e aguarda sua validação:</p>
+          <table style="width:100%;border-collapse:collapse">
+            <tr><td style="padding:8px;font-weight:bold;color:#555">Obra:</td><td style="padding:8px">${rdpInfo.obra}</td></tr>
+            <tr style="background:#f5f5f5"><td style="padding:8px;font-weight:bold;color:#555">Data:</td><td style="padding:8px">${rdpInfo.data}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;color:#555">Apontador:</td><td style="padding:8px">${rdpInfo.apontador}</td></tr>
+            <tr style="background:#f5f5f5"><td style="padding:8px;font-weight:bold;color:#555">Total Estacas:</td><td style="padding:8px">${rdpInfo.totalEstacas}</td></tr>
+          </table>
+          <div style="margin-top:20px;text-align:center">
+            <a href="${baseUrl}/medicao/engenheiro/validacao"
+               style="background:#BA1A1A;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">
+              Validar Relatório
+            </a>
+          </div>
+        </div>
+      </div>`,
+  });
+}
+
+export async function notifyGestorMedicaoSubmetida(
+  gestorEmail: string,
+  medicaoInfo: { obra: string; numero: number; valorLiquido: number; engenheiro: string; medicaoId: string }
+) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  await sendEmail({
+    to: gestorEmail,
+    subject: `[RBT] Boletim de Medição Nº ${medicaoInfo.numero} submetido — ${medicaoInfo.obra}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <div style="background:#111827;border-bottom:3px solid #BA1A1A;color:white;padding:20px;border-radius:8px 8px 0 0">
+          <h2 style="margin:0">RBT Fundações — Boletim de Medição Submetido</h2>
+        </div>
+        <div style="padding:20px;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px">
+          <p>Um Boletim de Medição foi submetido para sua aprovação:</p>
+          <table style="width:100%;border-collapse:collapse">
+            <tr><td style="padding:8px;font-weight:bold;color:#555">Obra:</td><td style="padding:8px">${medicaoInfo.obra}</td></tr>
+            <tr style="background:#f5f5f5"><td style="padding:8px;font-weight:bold;color:#555">Nº Medição:</td><td style="padding:8px">${medicaoInfo.numero}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;color:#555">Engenheiro:</td><td style="padding:8px">${medicaoInfo.engenheiro}</td></tr>
+            <tr style="background:#f5f5f5"><td style="padding:8px;font-weight:bold;color:#555">Valor Líquido:</td><td style="padding:8px">R$ ${medicaoInfo.valorLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr>
+          </table>
+          <div style="margin-top:20px;text-align:center">
+            <a href="${baseUrl}/medicao/engenheiro/medicoes/${medicaoInfo.medicaoId}"
+               style="background:#BA1A1A;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">
+              Revisar Medição
+            </a>
+          </div>
+        </div>
+      </div>`,
+  });
+}
+

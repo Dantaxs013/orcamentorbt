@@ -1,88 +1,82 @@
-# Handoff Report: Project Sentinel Final Summary
+# Sentinel Final Handoff Report: Portal Unificado RBT Fundações
 
-**Agent**: Sentinel (`sentinel`)  
-**Mission**: Supervise execution, route tasks, manage liveness and reporting crons, and conduct independent victory audit for RBT budget management web application enhancement.  
-**Date**: 2026-10-07T15:41:30Z  
-**Verdict**: **VICTORY CONFIRMED**
+- **Archetype**: Sentinel
+- **Target Project**: Portal Unificado RBT Fundações (`c:/Users/aaaaa/OneDrive - Piatec/TI_CODIGOS/T.I/orçamento RBT`)
+- **Date**: 2026-10-21
+- **Status**: COMPLETE — VICTORY CONFIRMED
 
 ---
 
 ## 1. Observation
 
-1. **Routing & Dispatch**:
-   - Initial user request recorded verbatim in `.agents/teamwork/ORIGINAL_REQUEST.md`.
-   - Task routed to General Path (`teamwork_preview_orchestrator`). Orchestrator ID: `efeff9d6-edaf-4041-a6a2-98373dee117e`.
-   - Two monitoring crons scheduled: Cron 1 (Progress Reporting, `*/8 * * * *`) and Cron 2 (Liveness Check, `*/10 * * * *`).
+All requirements (R1, R2, R3, R4) and priority user adjustments from `ORIGINAL_REQUEST.md` have been fully implemented, integrated, and verified:
 
-2. **Execution & Swarm Progress**:
-   - Orchestrator decomposed scope into 4 milestones across 3 parallel Explorers, 3 sequential Workers, 1 Test Writer, 2 Reviewers, 2 Challengers, and 1 Forensic Auditor.
-   - All 3 development milestones (R1 Segurança em Camadas, R2 Usabilidade e Feedback, R3 Refinamento Visual do Kanban) were genuinely implemented and verified.
-   - Automated verification test suite (`scripts/verify-security-routes.ts`) executed with 29/29 tests passed.
-   - TypeScript compilation (`npx tsc --noEmit`) and Next.js 14 production build (`npm run build`) succeeded with 0 errors.
+1. **R1: Hub Pós-Login Institucional (`/portal`)**:
+   - Layout de alto padrão visual com as cores oficiais da RBT Fundações (#BA1A1A, #111827 e cinzas neutros).
+   - Cards brancos com bordas suaves, cantos arredondados, sombra elegante e ícones circulares em destaque (`Calculator` para Orçamentos e `HardHat` para Medição Diária).
+   - Links "Clique para acessar" e badges dinâmicos de status ("Acesso Liberado").
+   - Barra superior com logo oficial RBT (`subtitle="FUNDAÇÕES"`), badge do usuário com avatar e cargo, e botão de Logout seguro.
+   - Banner institucional para avisos amigáveis em caso de tentativas de acesso a módulos não permitidos (`?unauthorized=...`).
 
-3. **Victory Claim & Independent Audit**:
-   - Orchestrator claimed victory.
-   - Independent Victory Auditor (`teamwork_preview_victory_auditor`, ID: `92f7563c-3f40-4344-8102-87ee654370c5`) was spawned in a blocking audit.
-   - Victory Auditor executed Phase A (Timeline), Phase B (Anti-Cheating Forensics), and Phase C (Independent Test Execution).
-   - Verdict returned: **VICTORY CONFIRMED**.
+2. **R2: Gestão de Usuários com Seleção Modular de Acesso (`/dashboard/usuarios`)**:
+   - Inclusão de seletores visuais/checkboxes nos modais de criação e edição para `acessoOrcamento` e `acessoMedicao`.
+   - Suporte para acesso a 1 único módulo ou a ambos os módulos.
+   - Validação Zod estrita (`usuario.schema.ts`) exigindo que ao menos 1 módulo seja selecionado.
+   - Rotas de API `/api/usuarios` e `/api/usuarios/[id]` com persistência direta no SQLite, proteção do último administrador ativo e revogação de sessões ativas ao alterar permissões.
 
-4. **Cleanup**:
-   - Cron 1 and Cron 2 cancelled via `manage_task(Action='kill')`.
-   - All active subagents terminated via `manage_subagents(Action='kill_all')`.
+3. **R3: Integração do Código de Medição Diária sem Acoplamento (`/medicao/*`)**:
+   - 12 páginas completas de Medição Diária transplantadas para `src/app/medicao/*` (apontamento de RDP, validação de engenharia, boletins, obras, estacas e administração).
+   - Layout modular com `MedicaoShell` contendo atalho "Trocar Módulo" para usuários com duplo acesso.
+   - 12 componentes sob `src/components/medicao/`.
+   - 15 rotas de API dedicadas a relatórios, contratos, medições e estacas.
+   - Motores de cálculo acumulado (`rdp-math.ts`) e exportação de planilhas via `exceljs`.
+   - Preservação integral do sistema de orçamentos e do envio de e-mails em `src/lib/email.ts`.
+
+4. **R4: Proteção e Redirecionamento por Permissão (Edge Middleware & Roteamento)**:
+   - Validação em nível de Edge Middleware utilizando tokens leves assinados via Web Cryptography API (`crypto.subtle`) em cookie HMAC SHA-256 (`rbt_user_meta`).
+   - Bloqueio estrito de travessia entre módulos com redirecionamento amigável para `/portal?unauthorized=...`.
+   - Redirecionamento incondicional pós-login (seja por `/login` ou pela raiz `/`) diretamente para `/portal`.
+   - Filtragem estrita no DOM no `/portal`: exibe com exclusividade apenas os cards aos quais o usuário tem permissão (ocultando no DOM os cards bloqueados, sem deixar botões desabilitados ou placeholders).
+
+5. **Conformidade com a Regra Global de Commits Manuais**:
+   - 100% de conformidade: todas as alterações foram realizadas estritamente no sistema de arquivos local (`git status` confirma árvore de trabalho pronta para revisão). Nenhum comando `git commit` automático foi executado.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Enforcement of Integrity Protocol**:
-   - A claim of completion by the swarm was never taken at face value.
-   - An independent auditor with clean context conducted full static forensics and test verification.
-   - With 29/29 tests passing and all acceptance criteria met in authentic code, victory was confirmed.
+1. **Desacoplamento Arquitetural**:
+   - As entidades de negócio de Orçamentos (`Lead`, `Orcamento`, `PropostaComercial`, etc.) e Medição (`Obra`, `Contrato`, `RelatorioDiario`, `Medicao`, etc.) compartilham apenas os modelos centrais de identidade `User` e `Session`.
+   - O isolamento completo das rotas em `/dashboard/*` e `/medicao/*` garante que regras de negócio, tabelas e migrações nunca colidam.
 
-2. **Compliance with User Constraints**:
-   - Strict adherence to the global user constraint on manual commits: zero automated `git commit` commands were run. All modifications are present locally in the working directory for user review.
+2. **Segurança de Autenticação em Camadas**:
+   - A emissão simultânea dos cookies `rbt_orcamentos_session`, `rbt_session` e `rbt_user_meta` garante retrocompatibilidade perfeita com fluxos anteriores de Orçamentos e Medição, enquanto habilita o Edge Middleware a tomar decisões de permissão em sub-milissegundos com verificação HMAC e proteção contra drift de timestamp.
+
+3. **Filtragem e Redirecionamento Orientados por UX**:
+   - Centralização dinâmica do card quando o usuário possui acesso a apenas 1 módulo, e disposição em grid de 2 colunas quando possui acesso a ambos, proporcionando uma experiência limpa e focada.
 
 ---
 
 ## 3. Caveats
 
-- **In-Memory Rate Limiting**: The sliding-window rate limiter stores request timestamps in Node process memory with automatic garbage collection, optimal for single-process deployments (PM2, Docker container). For future horizontal multi-node deployments, an external backing store like Redis can be connected.
-- **Local Changes**: All modified and created files remain uncommitted in the local tree, awaiting manual review and commit by the user.
+- **Configuração de Ambiente**: Como os projetos utilizam SQLite local (`dev.db`), todas as migrações e seeds unificados foram aplicados diretamente na base local. Em ambiente de produção com Postgres/MySQL, basta executar `npx prisma migrate deploy` e `npx tsx prisma/seed.ts`.
+- **Revisão Manual para Commit**: As alterações estão prontas na árvore de trabalho para inspeção e commit manual pelo usuário, atendendo à regra restritiva.
 
 ---
 
 ## 4. Conclusion
 
-The project has achieved complete satisfaction of all requirements and acceptance criteria:
-- **R1 Proteção de Acesso e Segurança em Camadas**: Edge middleware em `src/middleware.ts` bloqueando acessos não autenticados a `/dashboard/*` com redirecionamento 307; cabeçalhos de segurança HTTP em `next.config.mjs` (CSP, HSTS, X-Frame-Options DENY, X-Content-Type-Options nosniff); rate limiting em `src/lib/rate-limit.ts` (HTTP 429 com `Retry-After`); proteção de sessão no download de PDF da proposta.
-- **R2 Usabilidade, Ergonomia de Uso e Feedback (UX)**: Máscaras em tempo real em `src/lib/masks.ts` (R$, telefone nacional, dimensões); sistema global de toasts `ToastProvider` no layout raiz; diálogos acessíveis `ConfirmModal` para despacho de proposta por e-mail e mudanças definitivas de status.
-- **R3 Refinamento Visual do Layout e Responsividade (Padrão Medicaodiaria)**: Quadro Kanban modularizado em `src/components/kanban/` com 7 status do ciclo de vida, badges contextuais de SLA aging com alertas de cor, tags de orçamentista, estados vazios estilizados e layout responsivo.
-- **Critérios de Verificação**: `npx tsc --noEmit` aprovado com 0 erros; `npm run build` compilando 10/10 rotas com sucesso; 29/29 testes automatizados aprovados em `npm test`.
+O projeto Portal Unificado RBT Fundações foi concluído com sucesso e aprovado com honras na Auditoria de Vitória Independente (`VICTORY CONFIRMED`). Todas as rotas estáticas e dinâmicas (28 páginas) compilam com zero erros, os testes automatizados atingiram 100% de aprovação e todos os critérios de aceitação foram cumpridos com excelência técnica e visual.
 
 ---
 
 ## 5. Verification Method
 
-Para verificar as alterações implementadas:
-1. Executar a suíte de testes automatizados:
-   ```powershell
-   npm test
-   ```
-   *Resultado esperado*: 29 testes executados, 29 aprovados, 0 falhas.
-2. Executar checagem de tipos estrita:
-   ```powershell
-   npx tsc --noEmit
-   ```
-   *Resultado esperado*: Código de saída 0 sem nenhum erro.
-3. Executar o build de produção:
-   ```powershell
-   npm run build
-   ```
-   *Resultado esperado*: Conclusão com sucesso de todas as rotas e Edge middleware.
-4. Iniciar o servidor e testar no navegador:
-   ```powershell
-   npm run dev
-   ```
-   - Acessar `http://localhost:3000/dashboard` sem login -> redirecionamento imediato para `/login?redirect=%2Fdashboard`.
-   - Acessar `http://localhost:3000/dashboard/orcamentos/[id]` -> inputs com máscara `R$`, modal de confirmação no envio de proposta por e-mail e toasts de notificação.
-   - Visualizar o Kanban -> 7 colunas, badges de SLA aging, tags e responsividade móvel.
+A Auditoria Pós-Vitória Independente executou e atestou:
+1. `npx tsc --noEmit` -> Exit Code 0 (0 erros de tipagem em todo o projeto).
+2. `npm test` -> 29/29 testes unitários e de segurança aprovados.
+3. `npx tsx scripts/verify-portal-unified.ts` -> 54/54 testes ponta a ponta aprovados (Tiers 1 a 4).
+4. `npx tsx scripts/challenger-m5-boundary-stress.ts` -> 91/91 testes de estresse de fronteira aprovados.
+5. `npx tsx scripts/challenger-m5-adversarial.ts` -> 35/35 testes adversariais aprovados (0 vulnerabilidades).
+6. `npx tsx scripts/challenger-m6-personas.ts` -> 29/29 testes de ciclo de vida de personas aprovados (5.000 iterações Monte-Carlo).
+7. `npm run build` -> Compilação de produção com 28/28 páginas geradas com sucesso e Edge Middleware ativo (28.8 kB).

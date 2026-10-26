@@ -4,7 +4,6 @@ import { getServerSession } from '@/lib/session';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { KanbanBoard } from '@/components/kanban/kanban-board';
 import { NovaSolicitacaoModal } from '@/components/orcamentos/nova-solicitacao-modal';
-import { LinkPublicoCard } from '@/components/orcamentos/link-publico-card';
 import {
   FileText,
   Clock,
@@ -90,8 +89,6 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Link Fixo de Auto-Resposta de E-mail */}
-        <LinkPublicoCard />
 
         {/* Metric Cards KPI */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">

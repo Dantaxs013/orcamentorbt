@@ -8,7 +8,7 @@ import { RBTLogo } from '@/components/ui/rbt-logo';
 function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/dashboard';
+  const redirect = searchParams.get('redirect') || '/portal';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,7 +40,7 @@ function LoginFormContent() {
         return;
       }
 
-      router.push(redirect !== '/login' ? redirect : '/dashboard');
+      router.push(redirect !== '/login' ? redirect : '/portal');
       router.refresh();
     } catch {
       setErrorMessage('Erro de conexão com o servidor. Tente novamente.');
