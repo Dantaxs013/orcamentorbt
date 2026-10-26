@@ -6,6 +6,7 @@ import { RBTLogo } from '@/components/ui/rbt-logo';
 import { useToast } from '@/components/ui/toast-provider';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { formatPhoneBR } from '@/lib/masks';
+import { FileUploadField } from '@/components/formulario/file-upload-field';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -418,18 +419,14 @@ export default function FormularioMagicLinkPage() {
                     <option value="Não possuo sondagem">Não possuo sondagem (estimar com histórico da região)</option>
                   </select>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">
-                      Link da Sondagem (Google Drive, Dropbox, OneDrive ou link de visualização)
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.sondagensArquivoUrl}
-                      onChange={(e) => setFormData({ ...formData, sondagensArquivoUrl: e.target.value })}
-                      placeholder="https://drive.google.com/..."
-                      className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#BA1A1A]"
-                    />
-                  </div>
+                  <FileUploadField
+                    label="Anexo da Sondagem (PDF / Fotos) ou Link"
+                    value={formData.sondagensArquivoUrl}
+                    onChange={(url) => setFormData({ ...formData, sondagensArquivoUrl: url })}
+                    categoria="sondagens"
+                    helperText="Faça upload do laudo em PDF ou fotos, ou cole o link do drive."
+                    placeholderLink="https://drive.google.com/..."
+                  />
                 </div>
 
                 {/* Projetos */}
@@ -447,18 +444,14 @@ export default function FormularioMagicLinkPage() {
                     <option value="Apenas Projeto Arquitetônico">Apenas Projeto Arquitetônico (Necessita Solução de Engenharia RBT)</option>
                   </select>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">
-                      Link dos Projetos / Plantas (DWG, PDF ou pasta compartilhada)
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.projetosArquivoUrl}
-                      onChange={(e) => setFormData({ ...formData, projetosArquivoUrl: e.target.value })}
-                      placeholder="https://drive.google.com/..."
-                      className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#BA1A1A]"
-                    />
-                  </div>
+                  <FileUploadField
+                    label="Anexo dos Projetos (PDF / Fotos) ou Link"
+                    value={formData.projetosArquivoUrl}
+                    onChange={(url) => setFormData({ ...formData, projetosArquivoUrl: url })}
+                    categoria="projetos"
+                    helperText="Faça upload das pranchas/plantas em PDF ou fotos, ou cole o link."
+                    placeholderLink="https://drive.google.com/..."
+                  />
                 </div>
               </div>
 
