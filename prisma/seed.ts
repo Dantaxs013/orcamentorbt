@@ -47,8 +47,7 @@ async function main() {
     where: { email: 'admin@rbt.com.br' },
     update: {
       name: 'Gestor Geral RBT',
-      nome: 'Gestor Geral RBT',
-      passwordHash: defaultHash,
+            passwordHash: defaultHash,
       role: Role.ADMIN,
       ativo: true,
       telefone: '(41) 99999-3333',
@@ -57,8 +56,7 @@ async function main() {
     },
     create: {
       name: 'Gestor Geral RBT',
-      nome: 'Gestor Geral RBT',
-      email: 'admin@rbt.com.br',
+            email: 'admin@rbt.com.br',
       passwordHash: defaultHash,
       role: Role.ADMIN,
       ativo: true,
@@ -73,8 +71,7 @@ async function main() {
     where: { email: 'admin@rbtfundacoes.com.br' },
     update: {
       name: 'Dra. Mariana Costa (Gestora)',
-      nome: 'Dra. Mariana Costa (Gestora)',
-      passwordHash: defaultHash,
+            passwordHash: defaultHash,
       role: Role.ADMIN,
       ativo: true,
       telefone: '(41) 99999-3333',
@@ -83,8 +80,7 @@ async function main() {
     },
     create: {
       name: 'Dra. Mariana Costa (Gestora)',
-      nome: 'Dra. Mariana Costa (Gestora)',
-      email: 'admin@rbtfundacoes.com.br',
+            email: 'admin@rbtfundacoes.com.br',
       passwordHash: defaultHash,
       role: Role.ADMIN,
       ativo: true,
@@ -100,8 +96,7 @@ async function main() {
     where: { email: 'orcamentista@rbt.com.br' },
     update: {
       name: 'Engenheiro Orçamentista',
-      nome: 'Engenheiro Orçamentista',
-      passwordHash: defaultHash,
+            passwordHash: defaultHash,
       role: Role.ORCAMENTISTA,
       ativo: true,
       telefone: '(41) 98888-2222',
@@ -110,8 +105,7 @@ async function main() {
     },
     create: {
       name: 'Engenheiro Orçamentista',
-      nome: 'Engenheiro Orçamentista',
-      email: 'orcamentista@rbt.com.br',
+            email: 'orcamentista@rbt.com.br',
       passwordHash: defaultHash,
       role: Role.ORCAMENTISTA,
       ativo: true,
@@ -127,8 +121,7 @@ async function main() {
     where: { email: 'apontador@rbtfundacoes.com.br' },
     update: {
       name: 'Carlos Oliveira (Apontador)',
-      nome: 'Carlos Oliveira (Apontador)',
-      passwordHash: defaultHash,
+            passwordHash: defaultHash,
       role: Role.APONTADOR,
       ativo: true,
       telefone: '(41) 98888-1111',
@@ -137,8 +130,7 @@ async function main() {
     },
     create: {
       name: 'Carlos Oliveira (Apontador)',
-      nome: 'Carlos Oliveira (Apontador)',
-      email: 'apontador@rbtfundacoes.com.br',
+            email: 'apontador@rbtfundacoes.com.br',
       passwordHash: defaultHash,
       role: Role.APONTADOR,
       ativo: true,
@@ -154,8 +146,7 @@ async function main() {
     where: { email: 'engenheiro@rbtfundacoes.com.br' },
     update: {
       name: 'Eng. Roberto Mendes',
-      nome: 'Eng. Roberto Mendes',
-      passwordHash: defaultHash,
+            passwordHash: defaultHash,
       role: Role.ENGENHEIRO,
       ativo: true,
       telefone: '(41) 99999-2222',
@@ -164,8 +155,7 @@ async function main() {
     },
     create: {
       name: 'Eng. Roberto Mendes',
-      nome: 'Eng. Roberto Mendes',
-      email: 'engenheiro@rbtfundacoes.com.br',
+            email: 'engenheiro@rbtfundacoes.com.br',
       passwordHash: defaultHash,
       role: Role.ENGENHEIRO,
       ativo: true,
